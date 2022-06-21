@@ -54,5 +54,28 @@
       });
     });
   </script>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.8.3/firebase-app.js';
+
+    // If you enabled Analytics in your project, add the Firebase SDK for Google Analytics
+    import { getAnalytics } from 'https://www.gstatic.com/firebasejs/9.8.3/firebase-analytics.js';
+
+    // Add Firebase products that you want to use
+    import { getAuth } from 'https://www.gstatic.com/firebasejs/9.8.3/firebase-auth.js';
+    import { getFirestore } from 'https://www.gstatic.com/firebasejs/9.8.3/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDAcR_m0iz3PufCFeZ9wTjjkwn-ZMS8W3o",
+      authDomain: "porghub-8da18.firebaseapp.com",
+      projectId: "porghub-8da18",
+      storageBucket: "porghub-8da18.appspot.com",
+      messagingSenderId: "338700219242",
+      appId: "1:338700219242:web:605d8ed32cd705f623eb13",
+      measurementId: "G-B60YW2Y3R7"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+  </script>
 </body>
 </html>
