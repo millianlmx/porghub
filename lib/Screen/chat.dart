@@ -57,24 +57,22 @@ class _ChatState extends State<Chat> {
         child: Column(
           children: [
             widget.group
-                ? SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.05,
-                    child: Padding(
-                      padding: const EdgeInsets.all(5.0),
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: {
-                          'Mr Chips',
-                          'Jeyffrey',
-                          'Chauffeur',
-                          'DJ'
-                        }.map((String choice) {
-                          return RoleChip(
-                            role: choice,
-                            onTap: (state){},
-                          );
-                        }).toList(),
-                      ),
+                ? Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.all(0.0),
+                      scrollDirection: Axis.horizontal,
+                      children: {
+                        'Mr Chips',
+                        'Jeyffrey',
+                        'Chauffeur',
+                        'DJ',
+                        'Test'
+                      }.map((String choice) {
+                        return RoleChip(
+                          role: choice,
+                          onTap: (state) {},
+                        );
+                      }).toList(),
                     ),
                   )
                 : Container(),
