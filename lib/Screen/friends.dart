@@ -43,7 +43,7 @@ class FriendTile extends StatelessWidget {
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => const Chat(
-              title: "Premier amis",
+              eventId: "Premier amis",
               group: false,
             ),
           ),

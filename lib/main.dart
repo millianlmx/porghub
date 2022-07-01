@@ -100,7 +100,7 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         ],
       ),
-      body: selectedTab == 0 ? const Event() : const FriendsList(),
+      body: selectedTab == 0 ? const EventPage() : const FriendsList(),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute(

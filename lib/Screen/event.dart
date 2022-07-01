@@ -2,9 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import "package:flutter/material.dart";
 import 'package:porghub/Screen/chat.dart';
+import 'package:porghub/data.dart';
 
-class Event extends StatelessWidget {
-  const Event({
+class EventPage extends StatelessWidget {
+  const EventPage({
     Key? key,
   }) : super(key: key);
 
@@ -138,16 +139,34 @@ class PartyCard extends StatelessWidget {
                         SizedBox(
                           child: Row(
                             children: [
-                              Text(
-                                "25",
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyText1
-                                    ?.copyWith(
-                                      color:
-                                          Theme.of(context).colorScheme.outline,
-                                    ),
-                              ),
+                              FutureBuilder<
+                                      QuerySnapshot<Map<String, dynamic>>>(
+                                  future: FirebaseFirestore.instance
+                                      .collection("event")
+                                      .doc(eventID)
+                                      .collection("member")
+                                      .get(),
+                                  builder: (context, snapshotLength) {
+                                    if (snapshotLength.connectionState ==
+                                            ConnectionState.done &&
+                                        snapshotLength.hasData) {
+                                      return Text(
+                                        snapshotLength.data!.size.toString(),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyText1
+                                            ?.copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .outline,
+                                            ),
+                                      );
+                                    } else {
+                                      return const Center(
+                                        child: CircularProgressIndicator(),
+                                      );
+                                    }
+                                  }),
                               Icon(
                                 Icons.person,
                                 color: Theme.of(context).colorScheme.outline,
@@ -167,8 +186,8 @@ class PartyCard extends StatelessWidget {
                             onPressed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (constext) => const Chat(
-                                  title: "Test chat",
+                                builder: (constext) => Chat(
+                                  eventId: eventID,
                                   group: true,
                                 ),
                               ),
@@ -231,38 +250,39 @@ class EventCreatorState extends State<EventCreator> {
             onPressed: () async {
               final documentReference =
                   FirebaseFirestore.instance.collection("event").doc();
-              await documentReference.set({
-                "name": name.text,
-                "place": place.text,
-                "date": date.text,
-                "owner": FirebaseAuth.instance.currentUser?.uid,
-                "role": {},
-              });
+              await documentReference.set(Event(
+                name: name.text,
+                place: place.text,
+                date: date.text,
+                owner: FirebaseAuth.instance.currentUser!.uid,
+                role: {},
+              ).toMap());
 
               final userData = await FirebaseFirestore.instance
                   .collection("user")
                   .doc(FirebaseAuth.instance.currentUser?.uid)
                   .get();
 
-              documentReference
+              await documentReference
                   .collection("member")
                   .doc(FirebaseAuth.instance.currentUser?.uid)
-                  .set({
-                "name": userData.data()?["name"],
-                "photo": userData.data()?["photo"],
-                "level": userData.data()?["level"],
-              });
+                  .set(Member(
+                    name: userData.data()?["name"],
+                    photo: userData.data()?["photo"],
+                    level: userData.data()?["level"],
+                  ).toMap());
 
-              documentReference.collection("message").doc().set({
-                "text": "Événement créé !",
-                "type": "info",
-                "author": "${FirebaseAuth.instance.currentUser?.uid}",
-              });
+              await documentReference.collection("message").doc().set(Message(
+                    text: "Événement créé !",
+                    type: MessageType.info,
+                    author: "${FirebaseAuth.instance.currentUser?.uid}",
+                    createdAt: DateTime.now(),
+                  ).toMap());
 
-              List<dynamic> events = userData.data()?["events"];
+              List<String> events = userData.data()?["events"].cast<String>();
               events.add(documentReference.id);
 
-              FirebaseFirestore.instance
+              await FirebaseFirestore.instance
                   .collection("user")
                   .doc(FirebaseAuth.instance.currentUser?.uid)
                   .update({
