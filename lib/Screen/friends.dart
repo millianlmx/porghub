@@ -1,5 +1,6 @@
 import "package:flutter/material.dart";
 import 'package:porghub/Screen/chat.dart';
+import 'package:porghub/data.dart';
 
 class FriendsList extends StatelessWidget {
   const FriendsList({
@@ -45,6 +46,7 @@ class FriendTile extends StatelessWidget {
             builder: (context) => const Chat(
               eventId: "Premier amis",
               group: false,
+              
             ),
           ),
         ),

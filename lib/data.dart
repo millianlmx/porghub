@@ -43,7 +43,8 @@ class Message {
       : author = doc?.data()?["author"],
         type = stringToMessageType(doc?.data()?["type"]),
         text = doc?.data()?["text"],
-        createdAt = DateTime.parse(doc?.data()?["createdAd"]);
+        createdAt = DateTime.fromMillisecondsSinceEpoch(
+            doc?.data()?["createdAt"].millisecondsSinceEpoch);
 }
 
 enum MemberLevel {

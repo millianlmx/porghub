@@ -53,6 +53,7 @@ class PartyCard extends StatelessWidget {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.active &&
               snapshot.hasData) {
+            Event event = Event.fromDocumentSnapshot(snapshot.data);
             return Card(
               child: Container(
                 padding: const EdgeInsets.all(10.0),
@@ -118,21 +119,69 @@ class PartyCard extends StatelessWidget {
                     SizedBox(
                       height: MediaQuery.of(context).size.height * 0.01,
                     ),
-                    RichText(
-                      text: TextSpan(children: [
-                        TextSpan(
-                          text: "User ",
-                          style:
-                              Theme.of(context).textTheme.bodyText1?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                        ),
-                        TextSpan(
-                          text: "Last message",
-                          style: Theme.of(context).textTheme.bodyText1,
-                        ),
-                      ]),
-                    ),
+                    FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        future: FirebaseFirestore.instance
+                            .collection("event")
+                            .doc(eventID)
+                            .collection("message")
+                            .orderBy(
+                              "createdAt",
+                              descending: true,
+                            )
+                            .limit(1)
+                            .get(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                                  ConnectionState.done &&
+                              snapshot.hasData) {
+                            Message message = Message.fromDocumentSnapshot(
+                              snapshot.data?.docs.first,
+                            );
+                            return FutureBuilder<
+                                    DocumentSnapshot<Map<String, dynamic>>>(
+                                future: FirebaseFirestore.instance
+                                    .collection("event")
+                                    .doc(eventID)
+                                    .collection("member")
+                                    .doc(message.author)
+                                    .get(),
+                                builder: (context, snapshotUser) {
+                                  if (snapshot.connectionState ==
+                                          ConnectionState.done &&
+                                      snapshot.hasData) {
+                                    return RichText(
+                                      text: TextSpan(
+                                        children: [
+                                          TextSpan(
+                                            text: snapshotUser.data
+                                                ?.data()?["name"],
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyText1
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                          ),
+                                          const TextSpan(
+                                            text: " ",
+                                          ),
+                                          TextSpan(
+                                            text: message.text,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyText1,
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  } else {
+                                    return Container();
+                                  }
+                                });
+                          } else {
+                            return Container();
+                          }
+                        }),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -187,6 +236,7 @@ class PartyCard extends StatelessWidget {
                               context,
                               MaterialPageRoute(
                                 builder: (constext) => Chat(
+                                  event: event,
                                   eventId: eventID,
                                   group: true,
                                 ),
