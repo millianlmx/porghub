@@ -41,60 +41,35 @@ class _ChatState extends State<Chat> {
         title: Text(widget.group ? widget.event!.name : widget.frienName!),
         actions: [
           widget.group
-              ? PopupMenuButton<String>(
-                  onSelected: (choice) async {
-                    if (choice == 'Changer de nom') {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              NameChanger(eventID: widget.eventId),
-                        ),
-                      );
-                    } else if (choice == "Partager l'évènement") {
-                      bool copy =
-                          await FlutterClipboard.controlC(widget.eventId);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            copy
-                                ? "Code ajouter dans le presse-papier"
-                                : "Une erreur est survenue",
+              ? Theme(
+                  data: Theme.of(context).copyWith(
+                    useMaterial3: false,
+                  ),
+                  child: PopupMenuButton<String>(
+                    tooltip: "Options",
+                    elevation: 4.0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4.0),
+                    ),
+                    position: PopupMenuPosition.over,
+                    onSelected: (choice) async {
+                      if (choice == 'Changer de nom') {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                NameChanger(eventID: widget.eventId),
                           ),
-                          action: SnackBarAction(
-                            label: "OK",
-                            onPressed: () => ScaffoldMessenger.of(context)
-                                .hideCurrentSnackBar(),
-                          ),
-                        ),
-                      );
-                    } else {
-                      if (FirebaseAuth.instance.currentUser?.uid ==
-                          widget.event!.owner) {
-                        switch (choice) {
-                          case 'Ajouter un rôle':
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    RoleCreator(eventID: widget.eventId),
-                              ),
-                            );
-                            break;
-                          case 'Exclure un membre':
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    MemberBanner(eventID: widget.eventId),
-                              ),
-                            );
-                            break;
-                          default:
-                            break;
-                        }
-                      } else {
+                        );
+                      } else if (choice == "Partager l'évènement") {
+                        bool copy =
+                            await FlutterClipboard.controlC(widget.eventId);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: const Text(
-                                "Vous n'êtes pas l'organisateur de l'évènement !"),
+                            content: Text(
+                              copy
+                                  ? "Code ajouter dans le presse-papier"
+                                  : "Une erreur est survenue",
+                            ),
                             action: SnackBarAction(
                               label: "OK",
                               onPressed: () => ScaffoldMessenger.of(context)
@@ -102,30 +77,66 @@ class _ChatState extends State<Chat> {
                             ),
                           ),
                         );
+                      } else {
+                        if (FirebaseAuth.instance.currentUser?.uid ==
+                            widget.event!.owner) {
+                          switch (choice) {
+                            case 'Ajouter un rôle':
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      RoleCreator(eventID: widget.eventId),
+                                ),
+                              );
+                              break;
+                            case 'Exclure un membre':
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      MemberBanner(eventID: widget.eventId),
+                                ),
+                              );
+                              break;
+                            default:
+                              break;
+                          }
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                  "Vous n'êtes pas l'organisateur de l'évènement !"),
+                              action: SnackBarAction(
+                                label: "OK",
+                                onPressed: () => ScaffoldMessenger.of(context)
+                                    .hideCurrentSnackBar(),
+                              ),
+                            ),
+                          );
+                        }
                       }
-                    }
-                  },
-                  itemBuilder: (BuildContext context) {
-                    Set<String> options =
-                        FirebaseAuth.instance.currentUser?.uid ==
-                                widget.event!.owner
-                            ? {
-                                'Changer de nom',
-                                "Partager l'évènement",
-                                'Ajouter un rôle',
-                                'Exclure un membre',
-                              }
-                            : {
-                                'Changer de nom',
-                                "Partager l'évènement",
-                              };
-                    return options.map((String choice) {
-                      return PopupMenuItem<String>(
-                        value: choice,
-                        child: Text(choice),
-                      );
-                    }).toList();
-                  },
+                    },
+                    itemBuilder: (BuildContext context) {
+                      Set<String> options =
+                          FirebaseAuth.instance.currentUser?.uid ==
+                                  widget.event!.owner
+                              ? {
+                                  'Changer de nom',
+                                  "Partager l'évènement",
+                                  'Ajouter un rôle',
+                                  'Exclure un membre',
+                                }
+                              : {
+                                  'Changer de nom',
+                                  "Partager l'évènement",
+                                };
+                      return options.map((String choice) {
+                        return PopupMenuItem<String>(
+                          value: choice,
+                          child: Text(choice),
+                        );
+                      }).toList();
+                    },
+                  ),
                 )
               : Container(),
         ],
@@ -468,7 +479,7 @@ class Bubble extends StatelessWidget {
                     : Theme.of(context).colorScheme.tertiaryContainer,
               ),
               child: type == MessageType.text
-                  ? Text(
+                  ? SelectableText(
                       message,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.bold,
