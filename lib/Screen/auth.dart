@@ -37,7 +37,7 @@ Future<void> signInWithGoogle() async {
       "name": userCredential.user?.displayName,
       "email": userCredential.user?.email,
       "photo": userCredential.user?.photoURL,
-      "events": [],
+      "event": [],
       "friends": [],
       "level": "starter",
     });

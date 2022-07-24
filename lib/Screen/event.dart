@@ -20,12 +20,11 @@ class EventPage extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.active &&
               snapshot.hasData) {
             return Center(
-              child: ListView(
+              child: ListView.builder(
                 padding: const EdgeInsets.all(10.0),
-                children: snapshot.data
-                    ?.data()?["events"]
-                    .map<Widget>((eventID) => PartyCard(eventID: eventID))
-                    .toList(),
+                itemBuilder: (context, index) =>
+                    PartyCard(eventID: snapshot.data?.data()?["event"][index]),
+                itemCount: snapshot.data?.data()?["event"].length,
               ),
             );
           } else {
@@ -166,7 +165,10 @@ class PartyCard extends StatelessWidget {
                                             text: " ",
                                           ),
                                           TextSpan(
-                                            text: message.text,
+                                            text: message.type ==
+                                                    MessageType.image
+                                                ? "image"
+                                                : message.text,
                                             style: Theme.of(context)
                                                 .textTheme
                                                 .bodyText1,
@@ -286,7 +288,7 @@ class EventCreatorState extends State<EventCreator> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text("Nouveau événement"),
+        title: const Text("Nouvel événement"),
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.close),
@@ -324,19 +326,19 @@ class EventCreatorState extends State<EventCreator> {
 
               await documentReference.collection("message").doc().set(Message(
                     text: "Événement créé !",
-                    type: MessageType.info,
+                    type: MessageType.text,
                     author: "${FirebaseAuth.instance.currentUser?.uid}",
                     createdAt: DateTime.now(),
                   ).toMap());
 
-              List<String> events = userData.data()?["events"].cast<String>();
+              List<String> events = userData.data()?["event"].cast<String>();
               events.add(documentReference.id);
 
               await FirebaseFirestore.instance
                   .collection("user")
                   .doc(FirebaseAuth.instance.currentUser?.uid)
                   .update({
-                "events": events,
+                "event": events,
               });
 
               Navigator.of(context).pop();
@@ -380,6 +382,82 @@ class EventCreatorState extends State<EventCreator> {
               controller: place,
               decoration: InputDecoration(
                 labelText: "Lieu de l'évènement",
+                fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                filled: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class EventAdder extends StatefulWidget {
+  const EventAdder({Key? key}) : super(key: key);
+
+  @override
+  State<EventAdder> createState() => EventAdderState();
+}
+
+class EventAdderState extends State<EventAdder> {
+  late TextEditingController code;
+
+  @override
+  void initState() {
+    code = TextEditingController();
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: const Text("Ajouter un événement"),
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.close),
+        ),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(
+              textStyle: Theme.of(context).textTheme.labelLarge,
+            ),
+            child: const Text('Ajouter'),
+            onPressed: () async {
+              final userData = await FirebaseFirestore.instance
+                  .collection("user")
+                  .doc(FirebaseAuth.instance.currentUser?.uid)
+                  .get();
+
+              List<String> events = userData.data()?["event"].cast<String>();
+              events.add(code.text);
+
+              await FirebaseFirestore.instance
+                  .collection("user")
+                  .doc(FirebaseAuth.instance.currentUser?.uid)
+                  .update({
+                "event": events,
+              });
+
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(10.0),
+        child: Column(
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.05,
+            ),
+            TextField(
+              onSubmitted: (value) => setState(() => code.text = value),
+              controller: code,
+              decoration: InputDecoration(
+                labelText: "Code de l'évènement",
                 fillColor: Theme.of(context).colorScheme.surfaceVariant,
                 filled: true,
               ),

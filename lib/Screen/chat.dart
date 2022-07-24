@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:clipboard/clipboard.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -14,9 +15,11 @@ class Chat extends StatefulWidget {
     required this.eventId,
     required this.group,
     this.event,
+    this.frienName,
   }) : super(key: key);
 
   final String eventId;
+  final String? frienName;
   final Event? event;
   final bool group;
 
@@ -35,38 +38,28 @@ class _ChatState extends State<Chat> {
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.arrow_back),
         ),
-        title: Text(widget.event!.name),
+        title: Text(widget.group ? widget.event!.name : widget.frienName!),
         actions: [
           widget.group
               ? PopupMenuButton<String>(
-                  onSelected: (choice) {
-                    if (FirebaseAuth.instance.currentUser?.uid ==
-                        widget.event!.owner) {
-                      switch (choice) {
-                        case 'Ajouter un rôle':
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  RoleCreator(eventID: widget.eventId),
-                            ),
-                          );
-                          break;
-                        case 'Exclure un membre':
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  RoleCreator(eventID: widget.eventId),
-                            ),
-                          );
-                          break;
-                        default:
-                          break;
-                      }
-                    } else {
+                  onSelected: (choice) async {
+                    if (choice == 'Changer de nom') {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              NameChanger(eventID: widget.eventId),
+                        ),
+                      );
+                    } else if (choice == "Partager l'évènement") {
+                      bool copy =
+                          await FlutterClipboard.controlC(widget.eventId);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: const Text(
-                              "Vous n'êtes pas l'organisateur de l'évènement !"),
+                          content: Text(
+                            copy
+                                ? "Code ajouter dans le presse-papier"
+                                : "Une erreur est survenue",
+                          ),
                           action: SnackBarAction(
                             label: "OK",
                             onPressed: () => ScaffoldMessenger.of(context)
@@ -74,13 +67,59 @@ class _ChatState extends State<Chat> {
                           ),
                         ),
                       );
+                    } else {
+                      if (FirebaseAuth.instance.currentUser?.uid ==
+                          widget.event!.owner) {
+                        switch (choice) {
+                          case 'Ajouter un rôle':
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    RoleCreator(eventID: widget.eventId),
+                              ),
+                            );
+                            break;
+                          case 'Exclure un membre':
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    MemberBanner(eventID: widget.eventId),
+                              ),
+                            );
+                            break;
+                          default:
+                            break;
+                        }
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                                "Vous n'êtes pas l'organisateur de l'évènement !"),
+                            action: SnackBarAction(
+                              label: "OK",
+                              onPressed: () => ScaffoldMessenger.of(context)
+                                  .hideCurrentSnackBar(),
+                            ),
+                          ),
+                        );
+                      }
                     }
                   },
                   itemBuilder: (BuildContext context) {
-                    return {
-                      'Ajouter un rôle',
-                      'Exclure un membre',
-                    }.map((String choice) {
+                    Set<String> options =
+                        FirebaseAuth.instance.currentUser?.uid ==
+                                widget.event!.owner
+                            ? {
+                                'Changer de nom',
+                                "Partager l'évènement",
+                                'Ajouter un rôle',
+                                'Exclure un membre',
+                              }
+                            : {
+                                'Changer de nom',
+                                "Partager l'évènement",
+                              };
+                    return options.map((String choice) {
                       return PopupMenuItem<String>(
                         value: choice,
                         child: Text(choice),
@@ -212,7 +251,7 @@ class _ChatState extends State<Chat> {
             Expanded(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: FirebaseFirestore.instance
-                      .collection("event")
+                      .collection(widget.group ? "event" : "chat")
                       .doc(widget.eventId)
                       .collection("member")
                       .snapshots(),
@@ -226,16 +265,18 @@ class _ChatState extends State<Chat> {
                       };
                       return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                           stream: FirebaseFirestore.instance
-                              .collection("event")
+                              .collection(widget.group ? "event" : "chat")
                               .doc(widget.eventId)
                               .collection("message")
                               .orderBy(
                                 "createdAt",
                                 descending: true,
                               )
-                              .where("createdAt",
-                                  isGreaterThanOrEqualTo: DateTime.now()
-                                      .subtract(const Duration(days: 7)))
+                              .where(
+                                "createdAt",
+                                isGreaterThanOrEqualTo: DateTime.now()
+                                    .subtract(const Duration(days: 10)),
+                              )
                               .snapshots(),
                           builder: (context, msgSnapshot) {
                             if (msgSnapshot.connectionState ==
@@ -251,24 +292,37 @@ class _ChatState extends State<Chat> {
                                     )
                                     .cast<Message>()
                                     .map((message) {
-                                      final roles =
-                                          widget.event!.role.entries.where(
-                                        (entry) =>
-                                            entry.value == message.author,
-                                      );
+                                      List<String> roles = widget.group
+                                          ? widget.event!.role.entries
+                                              .where(
+                                                (entry) =>
+                                                    entry.value ==
+                                                    message.author,
+                                              )
+                                              .map<String>((entry) => entry.key)
+                                              .toList()
+                                              .cast<String>()
+                                          : [];
                                       return Bubble(
+                                        group: widget.group,
                                         message: message.text,
                                         type: message.type,
                                         author: members[message.author]!.name,
                                         role: roles.isEmpty
                                             ? ""
                                             : roles
-                                                .map((role) =>
-                                                    role.key.characters.first)
+                                                .map(
+                                                  (role) =>
+                                                      role.characters.first,
+                                                )
                                                 .toList()
                                                 .join(),
-                                        isSend: message.author ==
-                                            widget.event!.owner,
+                                        isSend: widget.group
+                                            ? message.author ==
+                                                widget.event!.owner
+                                            : message.author ==
+                                                FirebaseAuth
+                                                    .instance.currentUser?.uid,
                                       );
                                     })
                                     .cast<Widget>()
@@ -325,7 +379,7 @@ class _ChatState extends State<Chat> {
                     String url = await snapshot.ref.getDownloadURL();
 
                     await FirebaseFirestore.instance
-                        .collection("event")
+                        .collection(widget.group ? "event" : "chat")
                         .doc(widget.eventId)
                         .collection("message")
                         .doc()
@@ -342,7 +396,7 @@ class _ChatState extends State<Chat> {
                   iconSize: 20.0,
                   onPressed: () async {
                     await FirebaseFirestore.instance
-                        .collection("event")
+                        .collection(widget.group ? "event" : "chat")
                         .doc(widget.eventId)
                         .collection("message")
                         .doc()
@@ -378,7 +432,9 @@ class Bubble extends StatelessWidget {
     required this.author,
     required this.role,
     required this.type,
+    required this.group,
   }) : super(key: key);
+  final bool group;
   final String message;
   final MessageType type;
   final String author;
@@ -389,13 +445,16 @@ class Bubble extends StatelessWidget {
   Widget build(BuildContext context) {
     return Wrap(
       children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8.0),
-          child: Align(
-            alignment: isSend ? Alignment.centerRight : Alignment.centerLeft,
-            child: Text("$author $role"),
-          ),
-        ),
+        group
+            ? Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Align(
+                  alignment:
+                      isSend ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Text("$author $role"),
+                ),
+              )
+            : const SizedBox(),
         Padding(
           padding: const EdgeInsets.only(bottom: 8.0),
           child: Align(
@@ -492,7 +551,7 @@ class RoleCreatorState extends State<RoleCreator> {
               height: MediaQuery.of(context).size.height * 0.05,
             ),
             TextField(
-              onSubmitted: (value) => setState(() => emoji.text = value),
+              onChanged: (value) => setState(() => emoji.text = value),
               controller: emoji,
               maxLength: 1,
               decoration: InputDecoration(
@@ -505,7 +564,7 @@ class RoleCreatorState extends State<RoleCreator> {
               height: MediaQuery.of(context).size.height * 0.05,
             ),
             TextField(
-              onSubmitted: (value) => setState(() => name.text = value),
+              onChanged: (value) => setState(() => name.text = value),
               controller: name,
               decoration: InputDecoration(
                 labelText: "Nom du rôle",
@@ -515,6 +574,170 @@ class RoleCreatorState extends State<RoleCreator> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class NameChanger extends StatefulWidget {
+  const NameChanger({
+    Key? key,
+    required this.eventID,
+  }) : super(key: key);
+  final String eventID;
+
+  @override
+  State<NameChanger> createState() => NameChangerState();
+}
+
+class NameChangerState extends State<NameChanger> {
+  late TextEditingController name;
+
+  @override
+  void initState() {
+    name = TextEditingController();
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: const Text("Nouveau nom"),
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.close),
+        ),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(
+              textStyle: Theme.of(context).textTheme.labelLarge,
+            ),
+            child: const Text('Changer'),
+            onPressed: () async {
+              await FirebaseFirestore.instance
+                  .collection("event")
+                  .doc(widget.eventID)
+                  .collection("member")
+                  .doc(FirebaseAuth.instance.currentUser!.uid)
+                  .update({
+                "name": name.text,
+              });
+
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(10.0),
+        child: Column(
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.05,
+            ),
+            TextField(
+              onChanged: (value) => setState(() => name.text = value),
+              controller: name,
+              decoration: InputDecoration(
+                labelText: "Nouveau nom",
+                fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                filled: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MemberBanner extends StatefulWidget {
+  const MemberBanner({
+    Key? key,
+    required this.eventID,
+  }) : super(key: key);
+  final String eventID;
+
+  @override
+  State<MemberBanner> createState() => _MemberBannerState();
+}
+
+class _MemberBannerState extends State<MemberBanner> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: const Text("Exclure un membre"),
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.close),
+        ),
+      ),
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection("event")
+            .doc(widget.eventID)
+            .collection("member")
+            .snapshots(),
+        builder: (context, snapshot) => snapshot.hasData &&
+                snapshot.connectionState == ConnectionState.active
+            ? ListView.builder(
+                itemCount: snapshot.data?.size,
+                itemBuilder: (context, index) => ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage: NetworkImage(
+                        Member.fromDocumentSnapshot(snapshot.data?.docs[index])
+                            .photo),
+                  ),
+                  title: Text(
+                    Member.fromDocumentSnapshot(snapshot.data?.docs[index])
+                        .name,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontSize: 20.0,
+                        ),
+                    textAlign: TextAlign.left,
+                  ),
+                  onTap: () async {
+                    Member member =
+                        Member.fromDocumentSnapshot(snapshot.data?.docs[index]);
+
+                    await FirebaseFirestore.instance
+                        .collection("event")
+                        .doc(widget.eventID)
+                        .collection("member")
+                        .doc(snapshot.data?.docs[index].id)
+                        .delete();
+
+                    await FirebaseFirestore.instance
+                        .collection("event")
+                        .doc(widget.eventID)
+                        .collection("banned")
+                        .doc(snapshot.data?.docs[index].id)
+                        .set(member.toMap());
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          "${member.name} a été exlue !",
+                        ),
+                        action: SnackBarAction(
+                          label: "OK",
+                          onPressed: () => ScaffoldMessenger.of(context)
+                              .hideCurrentSnackBar(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              )
+            : const Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              ),
       ),
     );
   }
