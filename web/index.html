@@ -1,19 +1,7 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
@@ -23,14 +11,15 @@
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="porghub">
-  <meta name="google-signin-client_id" content="338700219242-n2973cq9bn0ia47ic2sik78nn90op75v.apps.googleusercontent.com">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <meta name="apple-mobile-web-app-title" content="PorgHUB">
+  <meta name="google-signin-client_id"
+    content="338700219242-n2973cq9bn0ia47ic2sik78nn90op75v.apps.googleusercontent.com">
+  <link rel="apple-touch-icon" href="icons/Icon-192-ios.png">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="logo.png"/>
+  <link rel="icon" type="image/png" href="icons/Icon-256.png" />
 
-  <title>porghub</title>
+  <title>PorgHUB</title>
 
   <link rel="manifest" href="manifest.json">
 
@@ -41,31 +30,37 @@
   <!-- This script adds the flutter initialization JS code -->
   <script src="flutter.js" defer></script>
 </head>
+
 <body>
   <script>
-    window.addEventListener('load', function(ev) {
+    window.addEventListener('load', function (ev) {
+      navigator.serviceWorker.register("/firebase-messaging-sw.js");
       // Download main.dart.js
       _flutter.loader.loadEntrypoint({
         serviceWorker: {
           serviceWorkerVersion: serviceWorkerVersion,
         }
-      }).then(function(engineInitializer) {
+      }).then(function (engineInitializer) {
         return engineInitializer.initializeEngine();
-      }).then(function(appRunner) {
+      }).then(function (appRunner) {
         return appRunner.runApp();
       });
     });
   </script>
   <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.8.3/firebase-app.js';
+    // Import the functions you need from the SDKs you need
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.9.1/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.9.1/firebase-analytics.js";
+    // TODO: Add SDKs for Firebase products that you want to use
+    // https://firebase.google.com/docs/web/setup#available-libraries
 
-    // If you enabled Analytics in your project, add the Firebase SDK for Google Analytics
-    import { getAnalytics } from 'https://www.gstatic.com/firebasejs/9.8.3/firebase-analytics.js';
+    import { getAuth } from 'https://www.gstatic.com/firebasejs/9.9.1/firebase-auth.js';
+    import { getFirestore } from 'https://www.gstatic.com/firebasejs/9.9.1/firebase-firestore.js';
+    import { getMessaging } from "https://www.gstatic.com/firebasejs/9.9.1/firebase-messaging.js";
 
-    // Add Firebase products that you want to use
-    import { getAuth } from 'https://www.gstatic.com/firebasejs/9.8.3/firebase-auth.js';
-    import { getFirestore } from 'https://www.gstatic.com/firebasejs/9.8.3/firebase-firestore.js';
 
+    // Your web app's Firebase configuration
+    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
     const firebaseConfig = {
       apiKey: "AIzaSyDAcR_m0iz3PufCFeZ9wTjjkwn-ZMS8W3o",
       authDomain: "porghub-8da18.firebaseapp.com",
@@ -78,6 +73,10 @@
 
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const messaging = getMessaging(app);
+    const firestore = getFirestore(app);
   </script>
 </body>
+
 </html>
