@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import "package:flutter/material.dart";
 import 'package:porghub/Screen/chat.dart';
 import 'package:porghub/data.dart';
@@ -58,128 +59,175 @@ class FriendTile extends StatelessWidget {
             future:
                 FirebaseFirestore.instance.collection("chat").doc(chatID).get(),
             builder: (context, snapshot) {
-              return FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  future: FirebaseFirestore.instance
-                      .collection("chat")
-                      .doc(chatID)
-                      .collection("member")
-                      .get(),
-                  builder: (context, memberSnapshot) {
-                    if (memberSnapshot.hasData &&
-                        memberSnapshot.connectionState == ConnectionState.done) {
-                      return FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                          future: FirebaseFirestore.instance
-                              .collection("chat")
-                              .doc(chatID)
-                              .collection("message")
-                              .orderBy(
-                                "createdAt",
-                                descending: true,
-                              )
-                              .limit(1)
-                              .get(),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasData &&
-                                snapshot.connectionState ==
-                                    ConnectionState.done) {
-                              Member friend = memberSnapshot.data?.docs[0].id ==
-                                      FirebaseAuth.instance.currentUser?.uid
-                                  ? Member.fromDocumentSnapshot(
-                                      memberSnapshot.data?.docs[1])
-                                  : Member.fromDocumentSnapshot(
-                                      memberSnapshot.data?.docs[0]);
-                              Message last = Message.fromDocumentSnapshot(
-                                  snapshot.data?.docs[0]);
-                              return InkWell(
-                                onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (context) => Chat(
-                                      eventId: chatID,
-                                      group: false,
-                                      frienName: friend.name,
-                                    ),
-                                  ),
-                                ),
-                                child: Column(
-                                  children: [
-                                    SizedBox(
-                                      child: Row(
-                                        children: [
-                                          CircleAvatar(
-                                            radius: 25.0,
-                                            backgroundImage: NetworkImage(
-                                              friend.photo,
-                                            ),
+              if (snapshot.hasData &&
+                  snapshot.connectionState == ConnectionState.done) {
+                if (snapshot.data?.data()?["isRequestAccepted"]) {
+                  return FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      future: FirebaseFirestore.instance
+                          .collection("chat")
+                          .doc(chatID)
+                          .collection("member")
+                          .get(),
+                      builder: (context, memberSnapshot) {
+                        if (memberSnapshot.hasData &&
+                            memberSnapshot.connectionState ==
+                                ConnectionState.done) {
+                          return FutureBuilder<
+                                  QuerySnapshot<Map<String, dynamic>>>(
+                              future: FirebaseFirestore.instance
+                                  .collection("chat")
+                                  .doc(chatID)
+                                  .collection("message")
+                                  .orderBy(
+                                    "createdAt",
+                                    descending: true,
+                                  )
+                                  .limit(1)
+                                  .get(),
+                              builder: (context, snapshot) {
+                                if (snapshot.hasData &&
+                                    snapshot.connectionState ==
+                                        ConnectionState.done) {
+                                  Member friend = memberSnapshot
+                                              .data?.docs[0].id ==
+                                          FirebaseAuth.instance.currentUser?.uid
+                                      ? Member.fromDocumentSnapshot(
+                                          memberSnapshot.data?.docs[1],
+                                        )
+                                      : Member.fromDocumentSnapshot(
+                                          memberSnapshot.data?.docs[0],
+                                        );
+                                  Message last = Message.fromDocumentSnapshot(
+                                    snapshot.data?.docs[0],
+                                  );
+                                  return InkWell(
+                                    onTap: () async {
+                                      await FirebaseFirestore.instance
+                                          .collection("chat")
+                                          .doc(chatID)
+                                          .collection("member")
+                                          .doc(FirebaseAuth
+                                              .instance.currentUser?.uid)
+                                          .update({
+                                        "token": await FirebaseMessaging
+                                            .instance
+                                            .getToken(
+                                          vapidKey:
+                                              "BMEBHFNT6NhEuSF9BMROWM6LPRBrkzP88GqxJ3m11R2SRO9XOevVFx6AzBs-Rdx2z1WfQQJl0kyKwuJAZa_QwBU",
+                                        ),
+                                      });
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (context) => Chat(
+                                            eventId: chatID,
+                                            group: false,
+                                            friendName: friend.name,
+                                            friendId: memberSnapshot
+                                                        .data?.docs[0].id ==
+                                                    FirebaseAuth.instance
+                                                        .currentUser?.uid
+                                                ? memberSnapshot
+                                                    .data?.docs[1].id
+                                                : memberSnapshot
+                                                    .data?.docs[0].id,
                                           ),
-                                          SizedBox(
-                                            width: MediaQuery.of(context)
-                                                    .size
-                                                    .width *
-                                                0.025,
-                                          ),
-                                          Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
+                                        ),
+                                      );
+                                    },
+                                    child: Column(
+                                      children: [
+                                        SizedBox(
+                                          child: Row(
                                             children: [
-                                              Text(
-                                                friend.name,
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .headline6,
-                                              ),
-                                              RichText(
-                                                text: TextSpan(
-                                                  children: [
-                                                    TextSpan(
-                                                      text: last.author ==
-                                                              FirebaseAuth
-                                                                  .instance
-                                                                  .currentUser
-                                                                  ?.uid
-                                                          ? "Vous"
-                                                          : friend.name,
-                                                      style: Theme.of(context)
-                                                          .textTheme
-                                                          .bodyText1
-                                                          ?.copyWith(
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                          ),
-                                                    ),
-                                                    const TextSpan(
-                                                      text: " ",
-                                                    ),
-                                                    TextSpan(
-                                                      text: last.type ==
-                                                              MessageType.image
-                                                          ? "image"
-                                                          : last.text,
-                                                      style: Theme.of(context)
-                                                          .textTheme
-                                                          .bodyText1,
-                                                    ),
-                                                  ],
+                                              CircleAvatar(
+                                                radius: 25.0,
+                                                backgroundImage: NetworkImage(
+                                                  friend.photo,
                                                 ),
+                                              ),
+                                              SizedBox(
+                                                width: MediaQuery.of(context)
+                                                        .size
+                                                        .width *
+                                                    0.025,
+                                              ),
+                                              Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    friend.name,
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .headline6,
+                                                  ),
+                                                  RichText(
+                                                    text: TextSpan(
+                                                      children: [
+                                                        TextSpan(
+                                                          text: last.author ==
+                                                                  FirebaseAuth
+                                                                      .instance
+                                                                      .currentUser
+                                                                      ?.uid
+                                                              ? "Vous"
+                                                              : friend.name,
+                                                          style:
+                                                              Theme.of(context)
+                                                                  .textTheme
+                                                                  .bodyText1
+                                                                  ?.copyWith(
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                  ),
+                                                        ),
+                                                        const TextSpan(
+                                                          text: " ",
+                                                        ),
+                                                        TextSpan(
+                                                          text: last.type ==
+                                                                  MessageType
+                                                                      .image
+                                                              ? "image"
+                                                              : last.text,
+                                                          style:
+                                                              Theme.of(context)
+                                                                  .textTheme
+                                                                  .bodyText1,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ],
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                        const Divider(
+                                          thickness: 1.0,
+                                        ),
+                                      ],
                                     ),
-                                    const Divider(
-                                      thickness: 1.0,
-                                    ),
-                                  ],
-                                ),
-                              );
-                            } else {
-                              return const CircularProgressIndicator();
-                            }
-                          });
-                    } else {
-                      return const CircularProgressIndicator();
-                    }
-                  });
+                                  );
+                                } else {
+                                  return const CircularProgressIndicator();
+                                }
+                              });
+                        } else {
+                          return const CircularProgressIndicator();
+                        }
+                      });
+                } else {
+                  return const ListTile(
+                    title: Text("Demande d'amis en cours d'acceptation"),
+                  );
+                }
+              } else {
+                return const Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
             }),
       ),
     );
@@ -207,7 +255,7 @@ class _FriendsAdderState extends State<FriendsAdder> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text("Exclure un membre"),
+        title: const Text("Ajouter un ami"),
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.close),

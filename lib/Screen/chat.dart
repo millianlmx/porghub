@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-
+import "package:http/http.dart" as http;
 import 'package:clipboard/clipboard.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,11 +15,13 @@ class Chat extends StatefulWidget {
     required this.eventId,
     required this.group,
     this.event,
-    this.frienName,
+    this.friendName,
+    this.friendId,
   }) : super(key: key);
 
   final String eventId;
-  final String? frienName;
+  final String? friendName;
+  final String? friendId;
   final Event? event;
   final bool group;
 
@@ -38,7 +40,7 @@ class _ChatState extends State<Chat> {
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.arrow_back),
         ),
-        title: Text(widget.group ? widget.event!.name : widget.frienName!),
+        title: Text(widget.group ? widget.event!.name : widget.friendName!),
         actions: [
           widget.group
               ? Theme(
@@ -328,12 +330,9 @@ class _ChatState extends State<Chat> {
                                                 )
                                                 .toList()
                                                 .join(),
-                                        isSend: widget.group
-                                            ? message.author ==
-                                                widget.event!.owner
-                                            : message.author ==
-                                                FirebaseAuth
-                                                    .instance.currentUser?.uid,
+                                        isSend: message.author ==
+                                            FirebaseAuth
+                                                .instance.currentUser?.uid,
                                       );
                                     })
                                     .cast<Widget>()
@@ -354,6 +353,54 @@ class _ChatState extends State<Chat> {
                   }),
             ),
             TextField(
+              textInputAction: TextInputAction.send,
+              onSubmitted: (value) async {
+                if (value.replaceAll(RegExp(r" "), "").isNotEmpty) {
+                  await FirebaseFirestore.instance
+                      .collection(widget.group ? "event" : "chat")
+                      .doc(widget.eventId)
+                      .collection("message")
+                      .doc()
+                      .set(
+                        Message(
+                          author: FirebaseAuth.instance.currentUser!.uid,
+                          createdAt: DateTime.now(),
+                          text: value,
+                          type: MessageType.text,
+                        ).toMap(),
+                      );
+                  DocumentSnapshot<Map<String, dynamic>> doc =
+                      await FirebaseFirestore.instance
+                          .collection(widget.group ? "event" : "chat")
+                          .doc(widget.eventId)
+                          .collection("member")
+                          .doc(FirebaseAuth.instance.currentUser!.uid)
+                          .get();
+
+                  Member me = Member.fromDocumentSnapshot(doc);
+
+                  DocumentSnapshot<Map<String, dynamic>> friendDoc =
+                      await FirebaseFirestore.instance
+                          .collection(widget.group ? "event" : "chat")
+                          .doc(widget.eventId)
+                          .collection("member")
+                          .doc(widget.friendId)
+                          .get();
+                  controller.clear();
+                  http.Response response;
+                  widget.group
+                      ? response = await http.get(
+                          Uri.parse(
+                            "https://us-central1-porghub-8da18.cloudfunctions.net/notifyGroup?groupId=${widget.eventId}&groupName=${widget.event?.name}&userName=${me.name}&message=$value",
+                          ),
+                        )
+                      : response = await http.get(
+                          Uri.parse(
+                            "us-central1-porghub-8da18.cloudfunctions.net/notifyUser?token=${friendDoc["token"]}&userId=${widget.friendId!}&userName=${me.name}&message=$value",
+                          ),
+                        );
+                }
+              },
               controller: controller,
               style: Theme.of(context)
                   .textTheme
@@ -406,20 +453,53 @@ class _ChatState extends State<Chat> {
                 suffixIcon: IconButton(
                   iconSize: 20.0,
                   onPressed: () async {
-                    await FirebaseFirestore.instance
-                        .collection(widget.group ? "event" : "chat")
-                        .doc(widget.eventId)
-                        .collection("message")
-                        .doc()
-                        .set(
-                          Message(
-                            author: FirebaseAuth.instance.currentUser!.uid,
-                            createdAt: DateTime.now(),
-                            text: controller.text,
-                            type: MessageType.text,
-                          ).toMap(),
-                        );
-                    controller.clear();
+                    if (controller.text
+                        .replaceAll(RegExp(r" "), "")
+                        .isNotEmpty) {
+                      await FirebaseFirestore.instance
+                          .collection(widget.group ? "event" : "chat")
+                          .doc(widget.eventId)
+                          .collection("message")
+                          .doc()
+                          .set(
+                            Message(
+                              author: FirebaseAuth.instance.currentUser!.uid,
+                              createdAt: DateTime.now(),
+                              text: controller.text,
+                              type: MessageType.text,
+                            ).toMap(),
+                          );
+                      DocumentSnapshot<Map<String, dynamic>> doc =
+                          await FirebaseFirestore.instance
+                              .collection(widget.group ? "event" : "chat")
+                              .doc(widget.eventId)
+                              .collection("member")
+                              .doc(FirebaseAuth.instance.currentUser!.uid)
+                              .get();
+
+                      Member me = Member.fromDocumentSnapshot(doc);
+
+                      DocumentSnapshot<Map<String, dynamic>> friendDoc =
+                          await FirebaseFirestore.instance
+                              .collection(widget.group ? "event" : "chat")
+                              .doc(widget.eventId)
+                              .collection("member")
+                              .doc(widget.friendId)
+                              .get();
+                      controller.clear();
+                      http.Response response;
+                      widget.group
+                          ? response = await http.get(
+                              Uri.parse(
+                                "https://us-central1-porghub-8da18.cloudfunctions.net/notifyGroup?groupId=${widget.eventId}&groupName=${widget.event?.name}&userName=${me.name}&message=${controller.text}",
+                              ),
+                            )
+                          : response = await http.get(
+                              Uri.parse(
+                                "https://us-central1-porghub-8da18.cloudfunctions.net/notifyUser?token=${friendDoc["token"]}&userId=${widget.friendId!}&userName=${me.name}&message=${controller.text}",
+                              ),
+                            );
+                    }
                   },
                   icon: const Icon(
                     Icons.send,
@@ -575,7 +655,23 @@ class RoleCreatorState extends State<RoleCreator> {
               height: MediaQuery.of(context).size.height * 0.05,
             ),
             TextField(
-              onChanged: (value) => setState(() => name.text = value),
+              textInputAction: TextInputAction.done,
+              onSubmitted: (value) async {
+                final event = await FirebaseFirestore.instance
+                    .collection("event")
+                    .doc(widget.eventID)
+                    .get();
+                final roles = event.data()?["role"];
+                roles["${emoji.text} $value"] = "";
+
+                await FirebaseFirestore.instance
+                    .collection("event")
+                    .doc(widget.eventID)
+                    .update({"role": roles});
+
+                Navigator.of(context).pop();
+              },
+              onEditingComplete: () => setState(() => name.text),
               controller: name,
               decoration: InputDecoration(
                 labelText: "Nom du rôle",
@@ -649,8 +745,21 @@ class NameChangerState extends State<NameChanger> {
               height: MediaQuery.of(context).size.height * 0.05,
             ),
             TextField(
-              onChanged: (value) => setState(() => name.text = value),
+              onSubmitted: (value) async {
+                await FirebaseFirestore.instance
+                    .collection("event")
+                    .doc(widget.eventID)
+                    .collection("member")
+                    .doc(FirebaseAuth.instance.currentUser!.uid)
+                    .update({
+                  "name": value,
+                });
+
+                Navigator.of(context).pop();
+              },
+              onEditingComplete: () => setState(() => name.text),
               controller: name,
+              textInputAction: TextInputAction.done,
               decoration: InputDecoration(
                 labelText: "Nouveau nom",
                 fillColor: Theme.of(context).colorScheme.surfaceVariant,
@@ -714,13 +823,6 @@ class _MemberBannerState extends State<MemberBanner> {
                   onTap: () async {
                     Member member =
                         Member.fromDocumentSnapshot(snapshot.data?.docs[index]);
-
-                    await FirebaseFirestore.instance
-                        .collection("event")
-                        .doc(widget.eventID)
-                        .collection("member")
-                        .doc(snapshot.data?.docs[index].id)
-                        .delete();
 
                     await FirebaseFirestore.instance
                         .collection("event")

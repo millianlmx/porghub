@@ -1,5 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:porghub/Screen/auth.dart';
@@ -11,10 +13,15 @@ import 'package:porghub/firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(ColorManager(
-    color: ValueNotifier<Color>(await getSeedColor()),
-    child: const MyApp(),
-  ));
+  if (await FirebaseMessaging.instance.isSupported()) {
+    await FirebaseMessaging.instance.requestPermission();
+  }
+  runApp(
+    ColorManager(
+      color: ValueNotifier<Color>(await getSeedColor()),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -24,7 +31,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder(
       valueListenable: ColorManager.of(context).color,
-      builder: (context, color, _) => MaterialApp(
+      builder: (BuildContext context, Color color, _) => MaterialApp(
         title: 'PorgHUB',
         theme: ThemeData(
           useMaterial3: true,
@@ -69,6 +76,34 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   int selectedTab = 0;
   ValueNotifier<bool> isDialOpen = ValueNotifier(false);
+
+  @override
+  void initState() {
+    FirebaseMessaging.onMessage.listen((data) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: data.notification!.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                TextSpan(
+                  text: " ${data.notification!.body}",
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +177,7 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => const EventAdder(),
+                builder: (context) => const EventJoiner(),
               ),
             ),
           ),
